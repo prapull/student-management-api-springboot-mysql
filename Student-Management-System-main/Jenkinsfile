@@ -1,9 +1,7 @@
 pipeline {
   agent any
   environment {
-    // image to deploy — change later if you want a different tag
     IMAGE = "prapullkhar/student-api:v1"
-    // set EC2_HOST before running deploy stage (placeholder now)
     EC2_HOST = "your.ec2.ip.address"
     EC2_USER = "ubuntu"
   }
@@ -14,8 +12,12 @@ pipeline {
 
     stage('Build JAR') {
       steps {
-        sh './mvnw -DskipTests package'
-        archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+        // change into the sub-project that contains mvnw and pom.xml
+        dir('Student-Management-System-main/SpringBootRestAPI') {
+          sh './mvnw -DskipTests package'
+        }
+        // archive the produced jar from its location
+        archiveArtifacts artifacts: 'Student-Management-System-main/SpringBootRestAPI/target/*.jar', fingerprint: true
       }
     }
 
