@@ -1,0 +1,46 @@
+pipeline {
+  agent any
+  environment {
+    // image to deploy — change later if you want a different tag
+    IMAGE = "prapullkhar/student-api:v1"
+    // set EC2_HOST before running deploy stage (placeholder now)
+    EC2_HOST = "your.ec2.ip.address"
+    EC2_USER = "ubuntu"
+  }
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+
+    stage('Build JAR') {
+      steps {
+        sh './mvnw -DskipTests package'
+        archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+      }
+    }
+
+    stage('Notify') {
+      steps { echo "Built JAR. Ready to deploy: ${IMAGE}" }
+    }
+
+    stage('Deploy to EC2') {
+      steps {
+        sshagent (credentials: ['ec2-ssh-key']) {
+          sh """
+            ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} 'docker pull ${IMAGE} || true'
+            ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
+              docker stop student-api-test 2>/dev/null || true
+              docker rm student-api-test 2>/dev/null || true
+              docker run -d --name student-api-test --restart unless-stopped -p 80:8080 ${IMAGE}
+            '
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    success { echo 'Pipeline succeeded.' }
+    failure { echo 'Pipeline failed — check logs.' }
+  }
+}
