@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Student API — Demo</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;background:#0b1220;color:#e6eef6;padding:24px}
+    .card{background:#0f1724;padding:18px;border-radius:10px;max-width:900px;margin:0 auto}
+    input,button{padding:8px;margin:6px;border-radius:6px;border:1px solid #223}
+    table{width:100%;margin-top:12px;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid #223;text-align:left}
+    th{color:#9aa4b2}
+    .muted{color:#9aa4b2;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Student API — Quick Demo</h2>
+    <p class="muted">This page calls the backend endpoints for a quick demo.</p>
+
+    <div>
+      <input id="name" placeholder="Name"/>
+      <input id="percentage" placeholder="Percentage" type="number" step="0.1"/>
+      <input id="branch" placeholder="Branch"/>
+      <button onclick="create()">Create</button>
+      <button onclick="load()">Refresh</button>
+      <span id="status" class="muted"></span>
+    </div>
+
+    <table id="tbl">
+      <thead><tr><th>RollNo</th><th>Name</th><th>%</th><th>Branch</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+<script>
+const base = '';
+function setStatus(msg, err=false){
+  const s=document.getElementById('status');
+  s.style.color = err ? 'salmon' : '#9aa4b2';
+  s.textContent = msg;
+  if(!err) setTimeout(()=>s.textContent='',2500);
+}
+async function load(){
+  try{
+    const res = await fetch(base + '/students');
+    const arr = await res.json();
+    const tb = document.querySelector('#tbl tbody');
+    tb.innerHTML = '';
+    arr.forEach(s=>{
+      const r = document.createElement('tr');
+      r.innerHTML = `<td>${s.rollNo ?? ''}</td><td>${escapeHtml(s.name)}</td><td>${s.percentage ?? ''}</td><td>${escapeHtml(s.branch)}</td>`;
+      tb.appendChild(r);
+    });
+    setStatus('Loaded', false);
+  }catch(e){ setStatus('Load error: '+e.message, true); }
+}
+async function create(){
+  const name=document.getElementById('name').value;
+  const percentage=parseFloat(document.getElementById('percentage').value||0);
+  const branch=document.getElementById('branch').value;
+  try{
+    const res = await fetch(base + '/students/add', {
+      method:'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, percentage, branch})
+    });
+    if(res.status===201 || res.ok){ setStatus('Created'); load(); }
+    else setStatus('Create failed: '+res.status, true);
+  }catch(e){ setStatus('Create error: '+e.message, true); }
+}
+function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
+window.onload = load;
+</script>
+</body>
+</html>
