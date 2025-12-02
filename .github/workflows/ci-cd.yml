@@ -1,0 +1,84 @@
+name: CI/CD - Student Management API (Docker Hub)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  PROJECT_DIR: student-management-api-springboot-mysql/Student-Management-System-main/SpringBootRestAPI
+  IMAGE_NAME: prapullkhar/student-api
+  CONTAINER_PORT: 8080
+
+jobs:
+  build:
+    name: Build JAR
+    runs-on: ubuntu-latest
+    outputs:
+      shortsha: ${{ steps.setsha.outputs.shortsha }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Build with Maven (package)
+        run: |
+          cd $PROJECT_DIR
+          mvn -B -DskipTests=false package
+
+      - name: Upload jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: ${{ env.PROJECT_DIR }}/target/*.jar
+
+      - name: Set short SHA
+        id: setsha
+        run: echo "::set-output name=shortsha::${GITHUB_SHA::8}"
+
+  docker:
+    name: Build & Push Docker image to Docker Hub
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo (for Docker context)
+        uses: actions/checkout@v4
+
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: ./artifact
+
+      - name: Place JAR in project target (so Dockerfile COPY works)
+        run: |
+          mkdir -p $PROJECT_DIR/target
+          cp ./artifact/*.jar $PROJECT_DIR/target/
+          ls -la $PROJECT_DIR/target
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.PROJECT_DIR }}
+          file: ${{ env.PROJECT_DIR }}/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ needs.build.outputs.shortsha }}
+            ${{ env.IMAGE_NAME }}:latest
