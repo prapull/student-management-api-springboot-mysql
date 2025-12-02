@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 env:
-  PROJECT_DIR: student-management-api-springboot-mysql/Student-Management-System-main/SpringBootRestAPI
+  PROJECT_DIR: Student-Management-System-main/SpringBootRestAPI
   IMAGE_NAME: prapullkhar/student-api
   CONTAINER_PORT: 8080
 
