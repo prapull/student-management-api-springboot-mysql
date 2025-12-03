@@ -2,76 +2,305 @@
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>Student API — Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Student Manager — Demo</title>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+
   <style>
-    body{font-family:Arial,Helvetica,sans-serif;background:#0b1220;color:#e6eef6;padding:24px}
-    .card{background:#0f1724;padding:18px;border-radius:10px;max-width:900px;margin:0 auto}
-    input,button{padding:8px;margin:6px;border-radius:6px;border:1px solid #223}
-    table{width:100%;margin-top:12px;border-collapse:collapse}
-    th,td{padding:8px;border-bottom:1px solid #223;text-align:left}
-    th{color:#9aa4b2}
-    .muted{color:#9aa4b2;font-size:13px}
+    /* ---- dark theme basics ---- */
+    :root{
+      --bg:#071022;
+      --card:#0f1722;
+      --muted:#9aa4b2;
+      --accent1:#37d5a4;
+      --accent2:#3b7fff;
+      --panel:#0b1220;
+      --row-border:rgba(255,255,255,0.03);
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071022 0%, #071827 100%);font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;color:#e6eef6;}
+    .wrap{max-width:1200px;margin:36px auto;padding:22px;}
+    .card{background:var(--card);padding:26px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.6);}
+
+    h1{margin:0 0 14px 0;font-size:28px}
+    p.muted{color:var(--muted);margin:0 0 18px 0}
+
+    /* form row */
+    .form-row{display:flex;gap:14px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+    input[type="text"], input[type="number"]{
+      min-width:200px;padding:12px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:#fff;color:#222;
+      box-shadow: inset 0 1px 0 rgba(0,0,0,0.03);
+    }
+    button{padding:10px 14px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#041018;font-weight:600}
+    .btn-ghost{background:#f3f3f3;color:#111;border-radius:8px;padding:9px 12px;box-shadow:none}
+    #status{margin-left:10px;color:#9aa4b2}
+
+    /* grid layout for table + chart */
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:18px;margin-top:12px}
+    .table-card{padding:18px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
+    table{width:100%;border-collapse:collapse}
+    thead th{color:var(--muted);text-align:left;padding:10px 6px 12px 6px}
+    tbody td{padding:12px 6px;border-bottom:1px solid var(--row-border)}
+    tbody tr td:first-child{width:56px}
+    .actions button{margin-right:8px;padding:6px 10px;border-radius:6px;background:#fff;color:#000;border:1px solid rgba(0,0,0,0.06)}
+
+    /* chart card */
+    .chart-card{padding:18px;border-radius:10px;background:#0f1724}
+    .chart-footer{margin-top:12px;display:flex;align-items:center;gap:12px}
+
+    /* info box */
+    .notes{margin-top:20px;background:rgba(255,255,255,0.02);padding:14px;border-radius:8px;color:var(--muted);}
+
+    /* ---------- Chart sizing ---------- */
+    .chart-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 520px;    /* optional limit on wide screens */
+      height: 300px;       /* set visible chart height */
+      margin: 0;
+      box-sizing: border-box;
+    }
+    .chart-wrapper canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    @media (max-width:980px){
+      .grid{grid-template-columns:1fr}
+      .form-row input{min-width:140px}
+      .chart-wrapper{max-width:100%;height:260px}
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>Student API — Quick Demo</h2>
-    <p class="muted">This page calls the backend endpoints for a quick demo.</p>
+  <div class="wrap">
+    <div class="card">
+      <h1>Student Manager — Demo</h1>
+      <p class="muted">CRUD + Visuals — show-ready UI. This page calls backend endpoints for a quick demo.</p>
 
-    <div>
-      <input id="name" placeholder="Name"/>
-      <input id="percentage" placeholder="Percentage" type="number" step="0.1"/>
-      <input id="branch" placeholder="Branch"/>
-      <button onclick="create()">Create</button>
-      <button onclick="load()">Refresh</button>
-      <span id="status" class="muted"></span>
+      <div class="form-row">
+        <input id="name" placeholder="Name" type="text"/>
+        <input id="percentage" placeholder="Percentage" type="number" step="0.1"/>
+        <input id="branch" placeholder="Branch" type="text"/>
+        <button id="btnCreate">Create</button>
+        <button id="btnRefresh" class="btn-ghost">Refresh</button>
+        <span id="status" class="muted"></span>
+      </div>
+
+      <div class="grid">
+        <div class="table-card">
+          <table id="tbl">
+            <thead>
+              <tr><th>RollNo</th><th>Name</th><th>%</th><th>Branch</th><th>Actions</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="chart-card">
+          <h3 style="margin:0 0 8px 0">Performance Chart</h3>
+
+          <!-- wrapped canvas: wrapper enforces height so Chart.js doesn't grow endlessly -->
+          <div class="chart-wrapper">
+            <canvas id="perfChart"></canvas>
+          </div>
+
+          <div class="chart-footer">
+            <button id="btnUpdateChart" class="btn-ghost">Update Chart</button>
+            <div class="muted" style="color:var(--muted)">Showing top students by roll</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <strong>Demo Notes:</strong> Use this UI to create, update and delete students. The chart visualizes percentages.
+      </div>
     </div>
-
-    <table id="tbl">
-      <thead><tr><th>RollNo</th><th>Name</th><th>%</th><th>Branch</th></tr></thead>
-      <tbody></tbody>
-    </table>
   </div>
 
 <script>
-const base = '';
-function setStatus(msg, err=false){
-  const s=document.getElementById('status');
-  s.style.color = err ? 'salmon' : '#9aa4b2';
-  s.textContent = msg;
-  if(!err) setTimeout(()=>s.textContent='',2500);
+/*
+  Client expects these backend endpoints:
+    GET  /students         -> returns array of student objects
+    POST /students/add     -> body { name, percentage, branch } -> creates student
+    PUT  /students/{id}    -> body { name, percentage, branch } -> updates student
+    DELETE /students/{id}  -> deletes student
+  If your backend uses different paths, change `base` or endpoint paths below.
+*/
+
+const base = ''; // served by Spring Boot same origin
+const statusEl = document.getElementById('status');
+const tbody = document.querySelector('#tbl tbody');
+
+function setStatus(msg, isError=false){
+  statusEl.textContent = msg;
+  statusEl.style.color = isError ? 'salmon' : 'var(--muted)';
+  if(!isError) setTimeout(()=>{ if(statusEl.textContent===msg) statusEl.textContent=''; }, 2200);
 }
+
 async function load(){
   try{
     const res = await fetch(base + '/students');
+    if(!res.ok) throw new Error(res.status + ' ' + res.statusText);
     const arr = await res.json();
-    const tb = document.querySelector('#tbl tbody');
-    tb.innerHTML = '';
-    arr.forEach(s=>{
-      const r = document.createElement('tr');
-      r.innerHTML = `<td>${s.rollNo ?? ''}</td><td>${escapeHtml(s.name)}</td><td>${s.percentage ?? ''}</td><td>${escapeHtml(s.branch)}</td>`;
-      tb.appendChild(r);
-    });
-    setStatus('Loaded', false);
-  }catch(e){ setStatus('Load error: '+e.message, true); }
+    renderTable(arr);
+    updateChart(arr);
+    setStatus('Loaded');
+  }catch(err){
+    setStatus('Load error: ' + err.message, true);
+    console.error(err);
+  }
 }
-async function create(){
-  const name=document.getElementById('name').value;
-  const percentage=parseFloat(document.getElementById('percentage').value||0);
-  const branch=document.getElementById('branch').value;
+
+function renderTable(arr){
+  tbody.innerHTML = '';
+  arr.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${s.rollNo ?? s.id ?? ''}</td>
+                    <td>${escapeHtml(s.name)}</td>
+                    <td>${s.percentage ?? ''}</td>
+                    <td>${escapeHtml(s.branch)}</td>
+                    <td class="actions">
+                      <button data-id="${s.rollNo ?? s.id}" class="edit">Edit</button>
+                      <button data-id="${s.rollNo ?? s.id}" class="del">Delete</button>
+                    </td>`;
+    tbody.appendChild(tr);
+  });
+  // wire actions
+  tbody.querySelectorAll('.edit').forEach(b => b.onclick = onEdit);
+  tbody.querySelectorAll('.del').forEach(b => b.onclick = onDelete);
+}
+
+function escapeHtml(s){
+  if(!s) return '';
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function onEdit(e){
+  const id = e.currentTarget.dataset.id;
+  // quick prompt-based edit (keeps UI tiny)
+  const row = e.currentTarget.closest('tr');
+  const currentName = row.children[1].textContent;
+  const currentPct = row.children[2].textContent;
+  const currentBranch = row.children[3].textContent;
+
+  const name = prompt('Edit name:', currentName);
+  if(name === null) return;
+  const percentage = prompt('Edit percentage:', currentPct);
+  if(percentage === null) return;
+  const branch = prompt('Edit branch:', currentBranch);
+  if(branch === null) return;
+
+  try{
+    const res = await fetch(`${base}/students/${id}`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ name, percentage: parseFloat(percentage||0), branch })
+    });
+    if(!res.ok) throw new Error(res.status+' '+res.statusText);
+    setStatus('Updated');
+    load();
+  }catch(err){
+    setStatus('Update error: '+err.message, true);
+  }
+}
+
+async function onDelete(e){
+  const id = e.currentTarget.dataset.id;
+  if(!confirm('Delete this student?')) return;
+  try{
+    const res = await fetch(`${base}/students/${id}`, { method:'DELETE' });
+    if(!res.ok) throw new Error(res.status+' '+res.statusText);
+    setStatus('Deleted');
+    load();
+  }catch(err){
+    setStatus('Delete error: '+err.message, true);
+  }
+}
+
+document.getElementById('btnCreate').addEventListener('click', async ()=>{
+  const name = document.getElementById('name').value.trim();
+  const percentage = parseFloat(document.getElementById('percentage').value || 0);
+  const branch = document.getElementById('branch').value.trim();
+  if(!name){ setStatus('Provide a name', true); return; }
   try{
     const res = await fetch(base + '/students/add', {
       method:'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name, percentage, branch})
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, percentage, branch })
     });
-    if(res.status===201 || res.ok){ setStatus('Created'); load(); }
-    else setStatus('Create failed: '+res.status, true);
-  }catch(e){ setStatus('Create error: '+e.message, true); }
+    if(!(res.ok || res.status===201)) throw new Error(res.status+' '+res.statusText);
+    setStatus('Created');
+    document.getElementById('name').value='';
+    document.getElementById('percentage').value='';
+    document.getElementById('branch').value='';
+    load();
+  }catch(err){
+    setStatus('Create error: '+err.message, true);
+  }
+});
+
+document.getElementById('btnRefresh').addEventListener('click', load);
+document.getElementById('btnUpdateChart').addEventListener('click', ()=>load());
+
+/* Chart.js setup */
+let chart;
+function updateChart(arr){
+  try{
+    const top = (arr||[]).slice().sort((a,b)=> (b.percentage||0) - (a.percentage||0)).slice(0,8);
+    const labels = top.map((s,i)=> `R#${s.rollNo ?? s.id ?? (i+1)}`);
+    const data = top.map(s => Number(s.percentage) || 0);
+
+    const ctx = document.getElementById('perfChart').getContext('2d');
+    if(chart) chart.destroy();
+
+    // determine a reasonable y-max
+    let maxVal = 100;
+    if(data.length){
+      const dmax = Math.max(...data);
+      maxVal = Math.max(100, Math.ceil(dmax + 10));
+    }
+
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Percentage',
+          data,
+          borderRadius: 6,
+          borderSkipped: false,
+          /* Default colors from Chart.js used; override if you want custom colors */
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,     // wrapper controls height
+        animation: { duration: 350 },
+        scales: {
+          x: {
+            ticks: { maxRotation: 0, autoSkip: true },
+            grid: { display: false }
+          },
+          y: {
+            beginAtZero: true,
+            suggestedMax: maxVal,
+            ticks: { stepSize: 10 }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: true }
+        }
+      }
+    });
+  }catch(e){ console.warn('chart error',e); }
 }
-function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
-window.onload = load;
+
+/* initial load */
+window.addEventListener('load', load);
 </script>
 </body>
 </html>
-
